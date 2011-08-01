@@ -3,35 +3,34 @@ use warnings;
 
 package Exporter::Lazy;
 
-require Exporter;
+use warnings::register;
 
-sub _export_sub($&);
+our $VERSION = '0.01';
+
+BEGIN {
+    require Exporter
+}
+
+my %exporters_for;
+my %exporters;
 
 sub import
 {
-    my $importer = caller;
+    my ($importer, $file, $line) = caller($Exporter::ExportLevel);
     no strict 'refs';
     *{"${importer}::import"} = \&_import;
+
+    $exporters{$importer} = [ $file, $line ];
+
+    if (@_ && $_[0] eq '-nocheck') {
+        #shift;
+    }
+    # The check is delayed to later because @EXPORT_LAZY
+    # may be declared, but not yet initialized if we are
+    # called either from a 'BEGIN' block or with 'use' and
+    # @EXPORT_LAZY is declared outside or below the block.
 }
 
-sub _export_sub($&)
-{
-    my ($fq_name, $code) = @_;
-    print "# Export $fq_name from ".(scalar caller(0)).' '.__PACKAGE__."\n";
-    no strict 'refs';
-    #my $sub = *{$fq_name};
-    #if (defined $sub && $sub != $code) {
-    #if (exists ${$pkg}{$name} && (exists ${$fq_name}{GLOB} || exists ${$fq_name}{CODE})) {
-    #    require Carp;
-    #    local $Carp::CarpLevel = $Carp::CarpLevel + 1;
-    #    Carp::croak(__PACKAGE__." is incompatible with other $name".ref($sub));
-    #}
-    *$fq_name = $code;
-}
-
-
-my %all_imports;
-my %exporters_for;
 
 sub _import
 {
@@ -44,49 +43,47 @@ sub _import
         $exporters_for{$importer} = [ $exporter ];
     }
     no strict 'refs';
+    # TODO do not install AUTOLOAD if the importer
+    #      imports all @EXPORT_LAZY (though @_)
     *{"${importer}::AUTOLOAD"} = \&_AUTOLOAD;
 
+    # Forward argument parsing to Exporter
+    # This allow to export both lazy and non-lazy
+    # and to let the import choose to import lazy
+    # symbols now (non lazy).
     goto &Exporter::import;
-
-    #my $no_check = 0;
-    #if (@_ && $_[0] eq '-nocheck') {
-    #    $no_check = 1;
-    #    shift;
-    #}
-
-    no strict 'refs';
-    #my $al_name = "${pkg}::AUTOLOAD";
-    #my $al = *{$al_name};
-    #if (defined $al && $al != \&_autoload) {
-    #    require Carp;
-    #    Carp::croak(__PACKAGE__." is incompatible with other AUTOLOAD");
-    #}
-    #*{$al_name} = \&_autoload;
-
-    print "# import from $exporter into $importer\n";
-
-    {
-        (local $Carp::CarpLevel)++;
-        _export_sub("${importer}::AUTOLOAD" => \&_AUTOLOAD);
-    }
-
-    # TODO handle ':all'
-    #my %sym_map = map +($_, "${exporter}::$_"), @_;
-    #@all_imports{ (map +("${importer}::$_"), keys %sym_map) } = (values %sym_map);
-    #@all_imports{ (map +("${importer}::$_"), keys %sym_map) } = (values %sym_map);
-    my %sym_map = map +("${importer}::$_", "${exporter}::$_"), @{"${exporter}::EXPORT_LAZY"};
-
-    #unless ($no_check) {
-        # TODO check conflicts
-        # - with existing subs in the package
-        #    - warn if the same symbol is imported twice
-        #    - die if a different symbol is imported
-        # - with previously imported symbols using __PACKAGE__
-    #}
-
-    #@all_imports{ (keys %sym_map) } = (values %sym_map);
-    %all_imports = ( %all_imports, %sym_map );
 }
+
+
+CHECK {
+    no strict 'refs';
+
+    # Once all imports have been done, we check the exporters for mistakes
+    # they may have done
+    # Exporter which are loaded at runtime will not be checked. This is a
+    # feature, not a bug.
+
+    foreach my $e (keys %exporters) {
+        # Check that we have an @EXPORT_LAZY
+        # If not we could delete the AUTOLOAD in importers
+        #print "Checking $e...\n";
+        my @exports = @{"${e}::EXPORT_LAZY"};
+        if (@exports) {
+            # TODO check
+            # - missing symbols in exporter
+            # - conflicts with existing subs in importers
+            #    - warn if the same symbol is imported twice
+            #    - die if a different symbol is imported
+	} else {
+            #if (warnings::enabled("$e")) {
+                warn("$e lacks \@EXPORT_LAZY at ".$exporters{$e}->[0]." line ".$exporters{$e}->[1]."\n");
+            #}
+        }
+    }
+}
+
+
+
 
 sub _AUTOLOAD {
     no strict 'refs';
@@ -113,6 +110,7 @@ sub _AUTOLOAD {
     goto &$fq_sub;
 }
 
+
 1;
 __END__
 
@@ -129,3 +127,17 @@ used by the importing package, the symbol will not be created.
 
 This module is useful if you want to limit the number of symbols used in your
 program.
+
+Drawbacks:
+
+=over 4
+
+=item *
+
+The lazy import is implemented
+
+=back
+
+=cut
+
+# vim: set ts=8 sw=4 sts=4:
