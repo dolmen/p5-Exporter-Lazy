@@ -54,6 +54,11 @@ sub _import
     goto &Exporter::import;
 }
 
+{
+# The CHECK block may never run if the module is loaded at runtime instead of
+# at BEGIN time. So we must do only optional checks here, and we want to
+# avoid the warning as we are aware of the issue.
+no warnings 'void';
 
 CHECK {
     no strict 'refs';
@@ -81,7 +86,7 @@ CHECK {
         }
     }
 }
-
+}
 
 
 
