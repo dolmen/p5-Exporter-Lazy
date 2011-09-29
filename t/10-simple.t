@@ -33,7 +33,7 @@ is MEU(), 3;
     eval { ZO(3) };
     ok $@, 'ZO not exported';
     like $@, qr/^Undefined subroutine/, 'Exception raised';
-    diag $@;
+    #diag $@;
 }
 
 

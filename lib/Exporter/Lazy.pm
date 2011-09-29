@@ -71,21 +71,20 @@ CHECK {
     foreach my $e (keys %exporters) {
         # Check that we have an @EXPORT_LAZY
         # If not we could delete the AUTOLOAD in importers
-        #print "Checking $e...\n";
-        my @exports = @{"${e}::EXPORT_LAZY"};
-        if (@exports) {
+        #if (! @exports) {
+        if (! exists ${$e.'::'}{EXPORT_LAZY}) {
+            #if (warnings::enabled("$e")) {
+                warn("$e lacks \@EXPORT_LAZY at ".$exporters{$e}->[0]." line ".$exporters{$e}->[1]."\n");
+            #}
+	} else {
             # TODO check
             # - missing symbols in exporter
             # - conflicts with existing subs in importers
             #    - warn if the same symbol is imported twice
             #    - die if a different symbol is imported
-	} else {
-            #if (warnings::enabled("$e")) {
-                warn("$e lacks \@EXPORT_LAZY at ".$exporters{$e}->[0]." line ".$exporters{$e}->[1]."\n");
-            #}
         }
     }
-}
+} # CHECK
 }
 
 
