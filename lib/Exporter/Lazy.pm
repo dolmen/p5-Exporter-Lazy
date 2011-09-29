@@ -120,7 +120,7 @@ __END__
 
 =head1 NAME
 
-Exporter::AutoLoad - Lazy exporter based on AUTOLOAD
+Exporter::Lazy - Lazy exporter based on AUTOLOAD
 
 =head1 SYNOPSIS
 
